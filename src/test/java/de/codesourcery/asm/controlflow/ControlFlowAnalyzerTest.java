@@ -74,7 +74,6 @@ public class ControlFlowAnalyzerTest {
                     assertEquals(9, graph.getAllNodes().size());
                 }
             }
-
         }
     }
 
@@ -123,12 +122,17 @@ public class ControlFlowAnalyzerTest {
 
                     IBlock firstBlock = getFirstBlock(graph);
                     IBlock firstBlockTrueOut = getTrueOutgoing(firstBlock);
-                    IBlock firstBlockFalseOut = getTrueOutgoing(firstBlock);
+                    IBlock firstBlockFalseOut = getFalseOutgoing(firstBlock);
                     assertNotNull(firstBlockTrueOut);
                     assertNotNull(firstBlockFalseOut);
 
                     assertEquals(getTrueOutgoing(firstBlockTrueOut), getFalseOutgoing(firstBlockTrueOut));
                     assertEquals(getTrueOutgoing(firstBlockFalseOut), getFalseOutgoing(firstBlockFalseOut));
+
+                    assertEquals(2, firstBlock.getRegularSuccessorCount());
+                    assertEquals(1, firstBlockTrueOut.getRegularSuccessorCount());
+
+                    assertEquals(firstBlockTrueOut.getRegularSuccessor(), graph.getEnd());
                 }
             }
         }
@@ -150,6 +154,50 @@ public class ControlFlowAnalyzerTest {
 
                     assertEquals(1, graph.getStart().getRegularSuccessorCount());
                     assertEquals(7, graph.getEnd().getRegularPredecessorCount());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testDoubleNestedIf() throws Exception {
+        String className = "DoubleNestedIf";
+        ClassNode cn = readClass(className);
+
+        for (Object m : cn.methods) {
+            MethodNode mn = (MethodNode) m;
+            if (!isConstructor(mn)) {
+                ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
+                final ControlFlowGraph graph = analyzer.analyze(className, mn);
+
+                if ("maxOfThree".equals(mn.name)) {
+                    generateDOTFile(className, graph);
+
+                    assertEquals(9, graph.getAllNodes().size());
+                    assertEquals(1, graph.getStart().getRegularSuccessorCount());
+                    assertEquals(4, graph.getEnd().getRegularPredecessorCount());
+
+                    IBlock firstBlock = getFirstBlock(graph);
+                    IBlock firstBlockTrueOut = getTrueOutgoing(firstBlock);
+                    IBlock firstBlockFalseOut = getFalseOutgoing(firstBlock);
+                    assertNotNull(firstBlockTrueOut);
+                    assertNotNull(firstBlockFalseOut);
+
+                    assertFalse(firstBlockTrueOut.equals(firstBlockFalseOut));
+
+                    assertEquals(2, firstBlockTrueOut.getRegularSuccessorCount());
+                    assertEquals(2, firstBlockFalseOut.getRegularSuccessorCount());
+
+                    assertEquals(1, getTrueOutgoing(firstBlockTrueOut).getRegularSuccessorCount());
+                    assertEquals(1, getFalseOutgoing(firstBlockTrueOut).getRegularSuccessorCount());
+
+                    assertEquals(1, getTrueOutgoing(firstBlockFalseOut).getRegularSuccessorCount());
+                    assertEquals(1, getFalseOutgoing(firstBlockFalseOut).getRegularSuccessorCount());
+
+                    assertEquals(getTrueOutgoing(firstBlockTrueOut).getRegularSuccessor(), graph.getEnd());
+                    assertEquals(getFalseOutgoing(firstBlockTrueOut).getRegularSuccessor(), graph.getEnd());
+                    assertEquals(getTrueOutgoing(firstBlockFalseOut).getRegularSuccessor(), graph.getEnd());
+                    assertEquals(getFalseOutgoing(firstBlockFalseOut).getRegularSuccessor(), graph.getEnd());
                 }
             }
         }
