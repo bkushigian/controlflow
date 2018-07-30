@@ -1,11 +1,11 @@
 package de.codesourcery.asm.controlflow;
 
-import de.codesourcery.asm.util.ASMUtil;
 import de.codesourcery.asm.misc.TestingUtil;
+import de.codesourcery.asm.util.CFGUtil;
 import org.junit.Test;
-import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
 
 import java.io.*;
 
@@ -14,54 +14,30 @@ import static org.junit.Assert.*;
 public class ControlFlowAnalyzerTest {
     private static File[] classPath = {new File(TestingUtil.TEST_CLASSES)};
 
-    public static ClassNode readClass(String className) throws IOException {
-        ClassReader reader = ASMUtil.createClassReader(className, classPath);
-        ClassNode cn = new ClassNode();
-        reader.accept(cn, 0);
-        return cn;
-    }
+    private void testMethodInClass(String className, String methodName, IBlock expected)
+            throws IOException, AnalyzerException {
+        ClassNode cn = CFGUtil.readClass(className, classPath);
 
-    public static void generateDOTFile(String className, ControlFlowGraph graph) throws FileNotFoundException {
-        String cfg = new DOTRenderer().render(graph);
-        PrintWriter pw = new PrintWriter(new FileOutputStream(
-                new File(TestingUtil.RESOURCES + "/dot/" + className + ".dot")));
-        pw.write(cfg);
-        pw.close();
-    }
+        for (Object m : cn.methods) {
+            MethodNode mn = (MethodNode) m;
+            if (! CFGUtil.isConstructor(mn)) {
+                ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
+                final ControlFlowGraph graph = analyzer.analyze(className, mn);
 
-    public static boolean isConstructor(MethodNode m) {
-        return "<init>".equals(m.name);
-    }
-
-    public static IBlock getFirstBlock(ControlFlowGraph graph) {
-        return graph.getStart().getRegularSuccessor();
-    }
-
-    private static IBlock getOutgoing(IBlock bb, String metadata) {
-        for (Edge edge : bb.getEdges()) {
-            if (edge.metaData != null && edge.metaData.equals(metadata)) {
-                return edge.dst;
+                if (methodName.equals(mn.name)) {
+                    assertTrue(CFGUtil.isIsomorphic(expected, graph.getStart()));
+                }
             }
         }
-
-        return null;
-    }
-
-    public static IBlock getTrueOutgoing(IBlock bb) {
-        return getOutgoing(bb, "true");
-    }
-
-    public static IBlock getFalseOutgoing(IBlock bb) {
-        return getOutgoing(bb, "false");
     }
 
     @Test
     public void testTests() throws Exception {
-        ClassNode cn = readClass("Tests");
+        ClassNode cn = CFGUtil.readClass("Tests", classPath);
 
        for (Object m : cn.methods) {
             MethodNode mn = (MethodNode) m;
-            if (! isConstructor(mn)) {
+            if (! CFGUtil.isConstructor(mn)) {
                 // TODO: Test structural properties
                 ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
                 final ControlFlowGraph graph = analyzer.analyze("Tests", mn);
@@ -79,78 +55,55 @@ public class ControlFlowAnalyzerTest {
 
     @Test
     public void testIf() throws Exception {
-        String className = "IfTest";
-        ClassNode cn = readClass(className);
+        CFGBuilder builder = new CFGBuilder();
+        IBlock bb1 = builder.makeBlock("bb1");
+        IBlock bb2 = builder.makeBlock("bb2");
+        IBlock bb3 = builder.makeBlock("bb3");
 
-       for (Object m : cn.methods) {
-           MethodNode mn = (MethodNode) m;
-           if (!isConstructor(mn)) {
-               ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
-                final ControlFlowGraph graph = analyzer.analyze(className, mn);
+        builder.addEdge(builder.getStart(), bb1);
 
-                if ("f".equals(mn.name)) {
-                    generateDOTFile(className, graph);
-                    assertEquals(5, graph.getAllNodes().size());
+        builder.addTrueEdge(bb1, bb2);
+        builder.addFalseEdge(bb1, bb3);
 
-                    assertEquals(1, graph.getStart().getRegularSuccessorCount());
-                    assertEquals(2, graph.getEnd().getRegularPredecessorCount());
+        builder.addEdge(bb2, builder.getEnd());
+        builder.addEdge(bb3, builder.getEnd());
 
-                    IBlock firstBlock = getFirstBlock(graph);
-                    assertEquals(2, firstBlock.getRegularSuccessorCount());
-                }
-           }
-       }
+        testMethodInClass("IfTest", "f", builder.getStart());
     }
 
     @Test
     public void testEmptyBlock1() throws Exception {
-        String className = "EmptyBlock1";
-        ClassNode cn = readClass(className);
+        CFGBuilder builder = new CFGBuilder();
+        IBlock bb1 = builder.makeBlock("bb1");
+        IBlock bb2 = builder.makeBlock("bb2");
+        IBlock bb3 = builder.makeBlock("bb3");
+        IBlock bb4 = builder.makeBlock("bb4");
 
-        for (Object m : cn.methods) {
-            MethodNode mn = (MethodNode) m;
-            if (!isConstructor(mn)) {
-                ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
-                final ControlFlowGraph graph = analyzer.analyze(className, mn);
+        builder.addEdge(builder.getStart(), bb1);
 
-                if ("f".equals(mn.name)) {
-                    generateDOTFile(className, graph);
+        builder.addTrueEdge(bb1, bb2);
+        builder.addFalseEdge(bb1, bb3);
 
-                    assertEquals(6, graph.getAllNodes().size());
-                    assertEquals(1, graph.getStart().getRegularSuccessorCount());
-                    assertEquals(2, graph.getEnd().getRegularPredecessorCount());
+        builder.addEdge(bb2, builder.getEnd());
+        builder.addEdge(bb3, bb4);
+        builder.addEdge(bb4, builder.getEnd());
 
-                    IBlock firstBlock = getFirstBlock(graph);
-                    IBlock firstBlockTrueOut = getTrueOutgoing(firstBlock);
-                    IBlock firstBlockFalseOut = getFalseOutgoing(firstBlock);
-                    assertNotNull(firstBlockTrueOut);
-                    assertNotNull(firstBlockFalseOut);
-
-                    assertEquals(getTrueOutgoing(firstBlockTrueOut), getFalseOutgoing(firstBlockTrueOut));
-                    assertEquals(getTrueOutgoing(firstBlockFalseOut), getFalseOutgoing(firstBlockFalseOut));
-
-                    assertEquals(2, firstBlock.getRegularSuccessorCount());
-                    assertEquals(1, firstBlockTrueOut.getRegularSuccessorCount());
-
-                    assertEquals(firstBlockTrueOut.getRegularSuccessor(), graph.getEnd());
-                }
-            }
-        }
+        testMethodInClass("EmptyBlock1", "f", builder.getStart());
     }
 
     @Test
     public void testTriangle127() throws Exception {
         String className = "Triangle127";
-        ClassNode cn = readClass(className);
+        ClassNode cn = CFGUtil.readClass(className, classPath);
 
         for (Object m : cn.methods) {
             MethodNode mn = (MethodNode) m;
-            if (!isConstructor(mn)) {
+            if (!CFGUtil.isConstructor(mn)) {
                 ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
                 final ControlFlowGraph graph = analyzer.analyze(className, mn);
 
                 if ("classify".equals(mn.name)) {
-                    generateDOTFile(className, graph);
+                    CFGUtil.generateDOTFile(className, graph);
 
                     assertEquals(1, graph.getStart().getRegularSuccessorCount());
                     assertEquals(7, graph.getEnd().getRegularPredecessorCount());
@@ -161,45 +114,31 @@ public class ControlFlowAnalyzerTest {
 
     @Test
     public void testDoubleNestedIf() throws Exception {
-        String className = "DoubleNestedIf";
-        ClassNode cn = readClass(className);
+        CFGBuilder builder = new CFGBuilder();
+        IBlock bb1 = builder.makeBlock("bb1");
+        IBlock bb2 = builder.makeBlock("bb2");
+        IBlock bb3 = builder.makeBlock("bb3");
+        IBlock bb4 = builder.makeBlock("bb4");
+        IBlock bb5 = builder.makeBlock("bb5");
+        IBlock bb6 = builder.makeBlock("bb6");
+        IBlock bb7 = builder.makeBlock("bb7");
 
-        for (Object m : cn.methods) {
-            MethodNode mn = (MethodNode) m;
-            if (!isConstructor(mn)) {
-                ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
-                final ControlFlowGraph graph = analyzer.analyze(className, mn);
+        builder.addEdge(builder.getStart(), bb1);
 
-                if ("maxOfThree".equals(mn.name)) {
-                    generateDOTFile(className, graph);
+        builder.addTrueEdge(bb1, bb2);
+        builder.addFalseEdge(bb1, bb3);
 
-                    assertEquals(9, graph.getAllNodes().size());
-                    assertEquals(1, graph.getStart().getRegularSuccessorCount());
-                    assertEquals(4, graph.getEnd().getRegularPredecessorCount());
+        builder.addTrueEdge(bb2, bb4);
+        builder.addFalseEdge(bb2, bb5);
 
-                    IBlock firstBlock = getFirstBlock(graph);
-                    IBlock firstBlockTrueOut = getTrueOutgoing(firstBlock);
-                    IBlock firstBlockFalseOut = getFalseOutgoing(firstBlock);
-                    assertNotNull(firstBlockTrueOut);
-                    assertNotNull(firstBlockFalseOut);
+        builder.addTrueEdge(bb3, bb6);
+        builder.addFalseEdge(bb3, bb7);
 
-                    assertFalse(firstBlockTrueOut.equals(firstBlockFalseOut));
+        builder.addEdge(bb4, builder.getEnd());
+        builder.addEdge(bb5, builder.getEnd());
+        builder.addEdge(bb6, builder.getEnd());
+        builder.addEdge(bb7, builder.getEnd());
 
-                    assertEquals(2, firstBlockTrueOut.getRegularSuccessorCount());
-                    assertEquals(2, firstBlockFalseOut.getRegularSuccessorCount());
-
-                    assertEquals(1, getTrueOutgoing(firstBlockTrueOut).getRegularSuccessorCount());
-                    assertEquals(1, getFalseOutgoing(firstBlockTrueOut).getRegularSuccessorCount());
-
-                    assertEquals(1, getTrueOutgoing(firstBlockFalseOut).getRegularSuccessorCount());
-                    assertEquals(1, getFalseOutgoing(firstBlockFalseOut).getRegularSuccessorCount());
-
-                    assertEquals(getTrueOutgoing(firstBlockTrueOut).getRegularSuccessor(), graph.getEnd());
-                    assertEquals(getFalseOutgoing(firstBlockTrueOut).getRegularSuccessor(), graph.getEnd());
-                    assertEquals(getTrueOutgoing(firstBlockFalseOut).getRegularSuccessor(), graph.getEnd());
-                    assertEquals(getFalseOutgoing(firstBlockFalseOut).getRegularSuccessor(), graph.getEnd());
-                }
-            }
-        }
+        testMethodInClass("DoubleNestedIf", "maxOfThree", builder.getStart());
     }
 }
