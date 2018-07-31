@@ -7,6 +7,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 
+import javax.naming.ldap.Control;
 import java.io.*;
 
 import static org.junit.Assert.*;
@@ -140,5 +141,69 @@ public class ControlFlowAnalyzerTest {
         builder.addEdge(bb7, builder.getEnd());
 
         testMethodInClass("DoubleNestedIf", "maxOfThree", builder.getStart());
+    }
+
+    /**
+     * The following two graphs are not isomorphic.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testIsIso() throws Exception {
+        CFGBuilder builder = new CFGBuilder();
+        CFGBuilder builder_ = new CFGBuilder();
+        IBlock a = builder.makeBlock("a"),
+               b = builder.makeBlock("b"),
+               c = builder.makeBlock("c"),
+               d = builder.makeBlock("d"),
+               e = builder.makeBlock("e"),
+               f = builder.makeBlock("f"),
+               g = builder.makeBlock("g"),
+               h = builder.makeBlock("h"),
+               i = builder.makeBlock("i"),
+               j = builder.makeBlock("j"),
+               a_ = builder_.makeBlock("a_"),
+               b_ = builder_.makeBlock("_b"),
+               c_ = builder_.makeBlock("_c"),
+               d_ = builder_.makeBlock("_d"),
+               e_ = builder_.makeBlock("_e"),
+               f_ = builder_.makeBlock("_f"),
+               g_ = builder.makeBlock("g_"),
+               h_ = builder.makeBlock("_h"),
+               i_ = builder.makeBlock("_i"),
+               j_ = builder.makeBlock("_j") ;
+
+        builder.addEdge(builder.getStart(), a);
+        builder_.addEdge(builder_.getStart(), a_);
+
+        // Graph G
+        builder.addTrueEdge (a, b);
+        builder.addFalseEdge(a, c);
+        builder.addTrueEdge (b, d);
+        builder.addFalseEdge(b, e);
+        builder.addTrueEdge (c, f);
+        builder.addFalseEdge(c, g);
+        builder.addEdge     (d, h);
+        builder.addEdge     (e, h);
+        builder.addEdge     (f, i);
+        builder.addEdge     (g, i);
+        builder.addEdge     (h, j);
+        builder.addEdge     (i, j);
+
+        // Graph G_
+        builder_.addTrueEdge (a_, b_);
+        builder_.addFalseEdge(a_, c_);
+        builder_.addTrueEdge (b_, d_);
+        builder_.addFalseEdge(b_, e_);
+        builder_.addTrueEdge (c_, f_);
+        builder_.addFalseEdge(c_, g_);
+        builder_.addEdge     (d_, i_);
+        builder_.addEdge     (e_, h_);
+        builder_.addEdge     (f_, h_);
+        builder_.addEdge     (g_, i_);
+        builder_.addEdge     (h_, j_);
+        builder_.addEdge     (i_, j_);
+
+        assertFalse(CFGUtil.isIsomorphic(builder.getStart(), builder_.getStart()));
     }
 }
