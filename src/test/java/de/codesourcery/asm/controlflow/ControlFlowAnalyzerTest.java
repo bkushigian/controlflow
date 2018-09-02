@@ -1,53 +1,14 @@
 package de.codesourcery.asm.controlflow;
 
-import de.codesourcery.asm.misc.TestingUtil;
+import de.codesourcery.asm.util.CFGBuilder;
 import de.codesourcery.asm.util.CFGUtil;
 import org.junit.Test;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.analysis.AnalyzerException;
-
-import javax.naming.ldap.Control;
-import java.io.*;
 
 import static org.junit.Assert.*;
 
-public class ControlFlowAnalyzerTest {
-    private static File[] classPath = {new File(TestingUtil.TEST_CLASSES)};
-
-    private void testMethodInClass(String className, String methodName, IBlock startBlock, boolean expectedEqual)
-            throws IOException, AnalyzerException {
-        ClassNode cn = CFGUtil.readClass(className, classPath);
-
-        for (Object m : cn.methods) {
-            MethodNode mn = (MethodNode) m;
-            if (! CFGUtil.isConstructor(mn)) {
-                ControlFlowAnalyzer analyzer = new ControlFlowAnalyzer();
-                final ControlFlowGraph graph = analyzer.analyze(className, mn);
-
-                if (methodName.equals(mn.name)) {
-                    CFGUtil.generateDOTFile(className + ":" + methodName, graph);
-
-                    if (expectedEqual) {
-                        assertTrue(CFGUtil.isIsomorphic(startBlock, graph.getStart()));
-                    } else {
-                        assertFalse(CFGUtil.isIsomorphic(startBlock, graph.getStart()));
-                    }
-                }
-            }
-        }
-    }
-
-    private void expectedEqual(String className, String methodName, IBlock startBlock)
-            throws IOException, AnalyzerException {
-        testMethodInClass(className, methodName, startBlock, true);
-    }
-
-    private void expectedUnequal(String className, String methodName, IBlock startBlock)
-            throws IOException, AnalyzerException {
-        testMethodInClass(className, methodName, startBlock, false);
-    }
-
+public class ControlFlowAnalyzerTest extends AbstractTest {
     @Test
     public void testTestsEmptyBlock() throws Exception {
         CFGBuilder builder = new CFGBuilder();
@@ -65,7 +26,7 @@ public class ControlFlowAnalyzerTest {
 
         builder.addEdge(bb3, builder.getEnd());
 
-        expectedEqual("Tests", "emptyBlock", builder.getStart());
+        expectedIsomorphic("Tests", "emptyBlock", builder.getStart());
     }
 
     @Test
@@ -85,7 +46,7 @@ public class ControlFlowAnalyzerTest {
 
         builder.addEdge(bb3, builder.getEnd());
 
-        expectedEqual("Tests", "emptyBlockWithSideEffects", builder.getStart());
+        expectedIsomorphic("Tests", "emptyBlockWithSideEffects", builder.getStart());
 
         ClassNode cn = CFGUtil.readClass("Tests", classPath);
 
@@ -118,7 +79,7 @@ public class ControlFlowAnalyzerTest {
         builder.addEdge(bb2, builder.getEnd());
         builder.addEdge(bb3, builder.getEnd());
 
-        expectedEqual("IfTest", "f", builder.getStart());
+        expectedIsomorphic("IfTest", "f", builder.getStart());
     }
 
     @Test
@@ -138,7 +99,7 @@ public class ControlFlowAnalyzerTest {
         builder.addEdge(bb3, bb4);
         builder.addEdge(bb4, builder.getEnd());
 
-        expectedEqual("EmptyBlock1", "f", builder.getStart());
+        expectedIsomorphic("EmptyBlock1", "f", builder.getStart());
     }
 
     @Test
@@ -189,7 +150,7 @@ public class ControlFlowAnalyzerTest {
         builder.addEdge(bb6, builder.getEnd());
         builder.addEdge(bb7, builder.getEnd());
 
-        expectedEqual("DoubleNestedIf", "maxOfThree", builder.getStart());
+        expectedIsomorphic("DoubleNestedIf", "maxOfThree", builder.getStart());
     }
 
     @Test
@@ -370,6 +331,6 @@ public class ControlFlowAnalyzerTest {
         builder.addEdge     (h, g);
         builder.addEdge     (g, builder.getEnd());
 
-        expectedUnequal("IfTest", "f", builder.getStart());
+        expectedNonIsomorphic("IfTest", "f", builder.getStart());
     }
 }

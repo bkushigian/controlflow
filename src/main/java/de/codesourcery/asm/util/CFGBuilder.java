@@ -1,4 +1,8 @@
-package de.codesourcery.asm.controlflow;
+package de.codesourcery.asm.util;
+
+import de.codesourcery.asm.controlflow.Block;
+import de.codesourcery.asm.controlflow.Edge;
+import de.codesourcery.asm.controlflow.IBlock;
 
 import java.util.*;
 

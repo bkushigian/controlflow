@@ -6,14 +6,12 @@ import de.codesourcery.asm.controlflow.Edge;
 import de.codesourcery.asm.controlflow.IBlock;
 import de.codesourcery.asm.misc.TestingUtil;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.*;
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 /**
  * Provides common utility tools to create and extract information from CFGs.
@@ -22,7 +20,7 @@ public class CFGUtil {
     /**
      * read the class at the given location
      * @param className name of the class
-     * @param classPath path to search
+     * @param classPath path to label
      * @return a ClassNode object associated with the class
      * @throws IOException
      */
@@ -91,7 +89,14 @@ public class CFGUtil {
         return getOutgoing(bb, "false");
     }
 
-    private static boolean search(IBlock bb, LabelCounter counter, Map<IBlock, Integer> labels) {
+    /**
+     * label graph
+     * @param bb basic block
+     * @param counter LabelCounter object
+     * @param labels mapping from basic blocks to labels
+     * @return true if finished successfully, false otherwise
+     */
+    private static boolean label(IBlock bb, LabelCounter counter, Map<IBlock, Integer> labels) {
         // do not label a basic block twice
         if (labels.containsKey(bb)) {
             return true;
@@ -101,15 +106,20 @@ public class CFGUtil {
 
             // check the number of successors of this vertex
             if (bb.getRegularSuccessorCount() == 2) {
-                return search(getTrueOutgoing(bb), counter, labels) && search(getFalseOutgoing(bb), counter, labels);
+                return label(getTrueOutgoing(bb), counter, labels) && label(getFalseOutgoing(bb), counter, labels);
             } else if (bb.getRegularSuccessorCount() == 1) {
-                return search(bb.getRegularSuccessor(), counter, labels);
+                return label(bb.getRegularSuccessor(), counter, labels);
             } else {
                 return true; // this is the end block, we can stop searching
             }
         }
     }
 
+    /**
+     * pair class to hold two values at once
+     * @param <K> first type
+     * @param <V> second type
+     */
     private static class Pair<K, V> {
         public final K first;
         public final V second;
@@ -120,6 +130,9 @@ public class CFGUtil {
         }
     }
 
+    /**
+     * generate a unique label
+     */
     private static class LabelCounter {
         private int counter;
 
@@ -129,12 +142,6 @@ public class CFGUtil {
 
         public int getUniqueLabel() {
             return counter++;
-        }
-    }
-
-    private static void printLabels(Map<IBlock, Integer> labels) {
-        for (IBlock bb : labels.keySet()) {
-            System.out.println(bb.getId() + " : " + labels.get(bb));
         }
     }
 
@@ -149,13 +156,10 @@ public class CFGUtil {
         Map<IBlock, Integer> labelBB2 = new HashMap<>();
 
         // label first graph
-        search(bb1, new LabelCounter(), labelBB1);
+        label(bb1, new LabelCounter(), labelBB1);
 
         // label second graph
-        search(bb2, new LabelCounter(), labelBB2);
-
-        printLabels(labelBB1);
-        printLabels(labelBB2);
+        label(bb2, new LabelCounter(), labelBB2);
 
         // compare the labels on the two graphs
         // labels on the corresponding nodes in the graphs should match
@@ -164,11 +168,6 @@ public class CFGUtil {
 
         while (! queue.isEmpty()) {
             Pair<IBlock, IBlock> p = queue.poll();
-
-            if (p.first != null && p.second != null) {
-            System.out.println("cmp: " + p.first.getId() + ", " + p.second.getId());
-            System.out.println("label: " + labelBB1.get(p.first) + ", " + labelBB2.get(p.second));
-                }
 
             // end of the graph, return true
             if ((p.first == null && p.second == null) ||
