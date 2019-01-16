@@ -128,7 +128,12 @@ public class ControlFlowAnalyzer
 
                 case AbstractInsnNode.INSN:
 
-                    if ( instruction.getOpcode() == Opcodes.RETURN || instruction.getOpcode() == Opcodes.IRETURN ) /* method exit */
+                    if (instruction.getOpcode() == Opcodes.RETURN ||
+                        instruction.getOpcode() == Opcodes.IRETURN ||
+                        instruction.getOpcode() == Opcodes.FRETURN ||
+                        instruction.getOpcode() == Opcodes.DRETURN ||
+                        instruction.getOpcode() == Opcodes.LRETURN ||
+                        instruction.getOpcode() == Opcodes.ARETURN) /* method exit */
                     {
                         currentLine.addRegularSuccessor( methodExit );
                         methodExit.addRegularPredecessor( currentLine );
@@ -201,9 +206,9 @@ public class ControlFlowAnalyzer
         
         final List<IBlock> result = mergeBlocks(blocks,mn);
 
-    	if ( debug ) {
-    		System.out.println("################ Control-blocks merged ################");
-    	}
+    	  if ( debug ) {
+    	  	System.out.println("################ Control-blocks merged ################");
+    	  }
         // sanity check
         final Set<Integer> linesAfterMerge = new HashSet<>();
         for ( IBlock block : result ) 
